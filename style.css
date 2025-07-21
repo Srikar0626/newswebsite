@@ -1,0 +1,355 @@
+/*
+  STYLE.CSS
+  This file contains all the custom styles for the news website.
+  A modern, professional theme.
+*/
+
+/* --- Root Variables for Theming --- */
+:root {
+    /* Professional & Modern Theme */
+    --bg-color: #f0f2f5;
+    --text-color: #212529;
+    --card-bg-color: #ffffff;
+    --header-bg-color: #274384;
+    --heading-color: #212529;
+    --border-color: #e2e8f0;
+    --link-color: #4a5568;
+    --link-hover-color: #007bff;
+    --top-bar-bg: #1c3269;
+    --ticker-bg: #d41f26;
+    --ticker-text: #ffffff;
+    --accent-color: #d41f26;
+}
+
+html.dark {
+    --bg-color: #1a202c;
+    --text-color: #e2e8f0;
+    --card-bg-color: #2d3748;
+    --header-bg-color: #274384; /* Keep brand blue */
+    --heading-color: #ffffff;
+    --border-color: #4a5568;
+    --link-color: #a0aec0;
+    --link-hover-color: #63b3ed;
+    --top-bar-bg: #1c3269; /* Keep brand blue */
+    --ticker-bg: #d41f26; /* Keep brand red */
+    --ticker-text: #ffffff;
+    --accent-color: #e53e3e; /* Brighter red for dark mode */
+}
+
+/* --- Base Body & Font Styles --- */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Roboto', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+}
+body.lang-te {
+    font-family: 'Noto Sans Telugu', sans-serif;
+}
+.font-playfair {
+    font-family: 'Playfair Display', serif;
+}
+body.lang-te .font-playfair {
+    font-family: 'Noto Sans Telugu', sans-serif;
+    font-weight: 700;
+}
+
+/* Override for the main site title to always use Playfair Display */
+body.lang-te header h1.font-playfair {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+}
+
+/* --- News Ticker (Horizontal Loop Style) --- */
+.news-ticker {
+    background-color: var(--ticker-bg);
+    color: var(--ticker-text);
+    padding: 0.75rem 0;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+.news-ticker-content {
+    display: inline-block;
+}
+
+
+/* --- Header & Top Bar --- */
+header {
+    background-color: var(--header-bg-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+/* Align logo and title */
+header .flex-shrink-0 > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+#current-date {
+    margin-top: 0.25rem; /* Move date down */
+}
+header h1, header p {
+    color: #ffffff;
+}
+.top-bar {
+    background-color: var(--top-bar-bg);
+}
+.top-bar a {
+    color: #ffffff;
+    opacity: 0.8;
+    transition: opacity 0.2s ease-in-out;
+}
+.top-bar a:hover {
+    opacity: 1;
+}
+#auth-container a, #auth-container select, #language-switcher {
+    color: #ffffff;
+}
+html.dark #auth-container a, html.dark #auth-container select, html.dark #language-switcher {
+     color: var(--text-color);
+}
+#auth-container option, #language-switcher option {
+    color: #212529; /* Dropdown options text color */
+}
+html.dark #auth-container option, html.dark #language-switcher option {
+    color: #212529;
+}
+
+
+/* --- Navigation --- */
+nav#main-nav {
+    background-color: var(--accent-color);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+}
+.nav-link {
+    transition: color 0.3s ease, background-color 0.3s ease;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.15rem; /* Adjusted base size for English */
+    font-weight: 500;
+}
+body.lang-te .nav-link {
+    font-size: 1.25rem; /* Slightly larger font size for Telugu to appear balanced */
+}
+.nav-link:hover {
+    background-color: rgba(0,0,0,0.1);
+    color: #ffffff;
+}
+.nav-link.active {
+    background-color: rgba(0,0,0,0.2);
+    color: #ffffff;
+}
+
+/* --- Main Content --- */
+.article-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    background-color: var(--card-bg-color);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    border-radius: 0.5rem;
+}
+.article-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.07), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+.edit-button { display: none; }
+body.edit-mode .edit-button { display: block; }
+#main-content-col h2 {
+    border-bottom-color: var(--accent-color) !important;
+}
+
+/* --- Modals --- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background: var(--card-bg-color);
+    padding: 2.5rem;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+}
+/* --- Slideshow Styles --- */
+.slideshow-container { position: relative; overflow: hidden; border-radius: 0.5rem; }
+.slide { display: none; animation: fade 1.5s ease-in-out; }
+.slide.active { display: block; }
+@keyframes fade {
+    from { opacity: .6 }
+    to { opacity: 1 }
+}
+.dots-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+}
+.dot {
+    cursor: pointer; height: 12px; width: 12px;
+    background-color: rgba(255,255,255,0.5); 
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 50%;
+    display: inline-block; transition: all 0.3s ease;
+}
+.dot.active, .dot:hover { 
+    background-color: #ffffff;
+    transform: scale(1.2);
+}
+
+/* --- Theming Adjustments --- */
+h1, h2, h3, h4 { color: var(--heading-color); }
+.modal-content label { color: var(--text-color); }
+.modal-content input, .modal-content textarea, .modal-content select,
+.settings-card input, .settings-card textarea, .settings-card select,
+.article-card input, .article-card textarea, .article-card select {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-color: var(--border-color);
+    border-radius: 0.375rem;
+}
+/* --- Ad Placeholder Styles --- */
+.ad-placeholder {
+    background-color: var(--border-color);
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; color: var(--link-color);
+    font-size: 0.875rem; border-radius: 0.5rem;
+}
+.ad-placeholder-header { width: 100%; max-width: 728px; height: 90px; margin: 1rem auto; }
+.ad-placeholder-in-feed { width: 100%; height: 120px; margin: 2rem 0; }
+.ad-placeholder-in-article { width: 100%; max-width: 300px; height: 250px; margin: 2rem auto; }
+.page-view { display: none; }
+
+/* --- Profile Dropdown --- */
+.profile-dropdown {
+    position: absolute; top: 100%; right: 0; margin-top: 0.75rem;
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    z-index: 100;
+    padding: 0.5rem 0;
+}
+#auth-container .profile-dropdown a, 
+#auth-container .profile-dropdown button {
+    color: var(--text-color);
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+.profile-dropdown a:hover, .profile-dropdown button:hover {
+    background-color: var(--bg-color);
+}
+
+/* --- Login Buttons --- */
+.login-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+}
+.login-btn:hover {
+    background-color: var(--bg-color);
+}
+
+/* --- Footer --- */
+footer {
+    background-color: #212529;
+}
+footer h3, footer h4 {
+    color: #ffffff;
+}
+
+/* --- Settings Page --- */
+.settings-card {
+    background-color: var(--card-bg-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border-color);
+}
+
+.settings-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+.settings-tab-button {
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    color: var(--link-color);
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+.settings-tab-button.active {
+    color: var(--link-hover-color);
+    border-bottom-color: var(--link-hover-color);
+}
+.settings-tab-content {
+    display: none;
+}
+.settings-tab-content.active {
+    display: block;
+}
+
+.settings-field-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.settings-field-group input {
+    flex-grow: 1;
+}
+
+/* --- Toast Notification Styles --- */
+.toast {
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-top: 0.5rem;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+.toast.success {
+    background-color: #28a745;
+}
+.toast.info {
+    background-color: #17a2b8;
+}
+.toast.error {
+    background-color: #dc3545;
+}
