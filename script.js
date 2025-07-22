@@ -2,6 +2,7 @@
  * SCRIPT.JS
  * This file contains all the JavaScript logic for the news website.
  * It handles state management, routing, rendering, user interactions, and admin controls.
+ * Data persistence is handled using localStorage.
  */
 
 // --- State Management ---
@@ -9,21 +10,25 @@ let currentLanguage = 'te';
 let isEditMode = false;
 let isLoggedIn = false;
 let loggedInUserType = null; // 'user' or 'admin'
+let loggedInUserProfile = {}; // To store Google user profile info
 let slideIndex = 0;
 let slideInterval;
 let tickerAnimationId;
-let lazyLoadObserver;
 
-// --- Site-wide Data (Can be replaced with API calls) ---
+// --- localStorage Keys ---
+const SITE_SETTINGS_KEY = 'bcTodaySiteSettings_v1';
+const SECTIONS_KEY = 'bcTodaySections_v1';
+
+// --- Site-wide Data (Will be overwritten by localStorage if available) ---
 
 // Translations for UI elements
 const translations = {
     en: {
         site_title: "BC TODAY",
-        // Common words kept in English
         epaper: "E-Paper", 
         about_us: "About Us", 
-        contact: "Contact Us",
+        contact_us: "Contact Us",
+        privacy_policy: "Privacy Policy",
         login: "Login", 
         settings: "Settings",
         enable_editing: "Enable Editing",
@@ -32,7 +37,6 @@ const translations = {
         follow_us: "Follow Us",
         remember_me: "Remember Me", 
         forgot_password: "Forgot Password?",
-        // Page specific
         home: "Home", local: "Local News", world: "World", business: "Business", sports: "Sports", opinion: "Opinion", cinema: "Cinema",
         breaking: "BREAKING",
         back_to_home: "&larr; Back to Home",
@@ -49,24 +53,25 @@ const translations = {
         no_results: "No articles found.",
         access_denied: "Access Denied",
         access_denied_msg: "You must be an admin to view this page.",
-        general_settings: "General", pages_content: "Pages", epaper_settings: "E-Paper",
+        general: "General", pages: "Pages", e_paper: "E-Paper",
         save_settings: "Save Settings",
-        ticker_items_en: "Ticker Items (English)", ticker_items_te: "Ticker Items (Telugu)",
+        ticker_items_english: "Ticker Items (English)", ticker_items_telugu: "Ticker Items (Telugu)",
         one_per_line: "One item per line",
         link_text: "Link Text", link_url: "URL", platform: "Platform",
         add_link: "Add Link", remove: "Remove",
-        page_title: "Page Title", page_content: "Page Content",
+        page_title: "Page Title", page_content: "Page Content (Markdown)",
         epaper_date: "Date", epaper_url: "PDF URL", add_epaper: "Add E-Paper",
-        site_identity: "Site Identity", logo_url: "Logo Image URL",
+        site_identity: "Site Identity", logo_image_url: "Logo Image URL",
         password_reset_info: "If an account exists, a reset link has been sent.",
         settings_saved: "Settings saved successfully!",
+        error_saving: "Error saving data. Changes might not persist.",
     },
     te: {
-        site_title: "BC TODAY", // Changed to English as requested
-        // Common words are now in English for both languages as requested
+        site_title: "BC TODAY",
         epaper: "E-Paper", 
         about_us: "About Us", 
-        contact: "Contact Us",
+        contact_us: "Contact Us",
+        privacy_policy: "Privacy Policy",
         login: "Login", 
         settings: "Settings",
         enable_editing: "Enable Editing",
@@ -75,34 +80,59 @@ const translations = {
         follow_us: "Follow Us",
         remember_me: "Remember Me", 
         forgot_password: "Forgot Password?",
-        breaking: "BREAKING", // Kept in English
-        // Page specific translations
+        breaking: "BREAKING",
         home: "హోమ్", local: "స్థానిక వార్తలు", world: "ప్రపంచ", business: "వ్యాపార", sports: "క్రీడలు", opinion: "అభిప్రాయం", cinema: "సినిమా",
         back_to_home: "&larr; హోమ్‌కు తిరిగి వెళ్ళు",
         rights_reserved: "అన్ని హక్కులూ ప్రత్యేకించుకోవడమైనది.",
-        add_new_story: "కొత్త వార్తను జోడించు", edit_article: "వ్యాసాన్ని సవరించండి", title: "శీర్షిక", author: "రచయిత", image_url: "చిత్రం URL", full_story: "పూర్తి కథనం", cancel: "రద్దు చేయి", save_changes: "భద్రపరచు", select_section: "విభాగాన్ని ఎంచుకోండి", add_story: "వార్తను జోడించు",
+        add_new_story: "Add New Story", 
+        edit_article: "వ్యాసాన్ని సవరించండి", 
+        title: "శీర్షిక", 
+        author: "రచయిత", 
+        image_url: "చిత్రం URL", 
+        full_story: "పూర్తి కథనం", 
+        cancel: "రద్దు చేయి", 
+        save_changes: "భద్రపరచు", 
+        select_section: "విభాగాన్ని ఎంచుకోండి", 
+        add_story: "వార్తను జోడించు",
         footer_tagline: "ప్రపంచానికి మీ గవాక్షం. ప్రతిరోజూ విశ్వసనీయ వార్తలను అందిస్తోంది.",
-        most_read: "అత్యధికంగా చదివినవి", photo_gallery: "ఫోటో గ్యాలరీ", related_stories: "సంబంధిత కథనాలు",
+        most_read: "అత్యధికంగా చదివినవి", 
+        photo_gallery: "ఫోటో గ్యాలరీ", 
+        related_stories: "సంబంధిత కథనాలు",
         search_results_for: "శోధన ఫలితాలు",
-        logout: "లాగ్ అవుట్",
-        user_login: "యూజర్ లాగిన్", user_login_prompt: "వ్యాఖ్యానించడానికి మరియు పాల్గొనడానికి మీ సోషల్ ఖాతాతో లాగిన్ అవ్వండి.",
-        login_with_google: "Google తో లాగిన్ అవ్వండి", staff_login: "సిబ్బంది లాగిన్",
-        username: "యూజర్‌నేమ్", password: "పాస్‌వర్డ్", login_error: "తప్పు యూజర్‌నేమ్ లేదా పాస్‌వర్డ్.",
+        logout: "Logout",
+        user_login: "User Login", 
+        user_login_prompt: "Login with your social account to comment and participate.",
+        login_with_google: "Google తో లాగిన్ అవ్వండి", 
+        staff_login: "Staff Login",
+        username: "Username", 
+        password: "Password", 
+        login_error: "తప్పు యూజర్‌నేమ్ లేదా పాస్‌వర్డ్.",
         add_new_article: "కొత్త వ్యాసం జోడించు",
         no_results: "వ్యాసాలు కనుగొనబడలేదు.",
-        access_denied: "ప్రాప్యత నిరాకరించబడింది",
-        access_denied_msg: "ఈ పేజీని చూడటానికి మీరు అడ్మిన్ అయి ఉండాలి.",
-        general_settings: "సాధారణ", pages_content: "పేజీలు", epaper_settings: "ఇ-పేపర్",
-        save_settings: "సెట్టింగ్‌లను సేవ్ చేయి",
-        ticker_items_en: "టిక్కర్ ఐటమ్స్ (ఇంగ్లీష్)", ticker_items_te: "టిక్కర్ ఐటమ్స్ (తెలుగు)",
+        access_denied: "Access Denied",
+        access_denied_msg: "You must be an admin to view this page.",
+        general: "General", 
+        pages: "Pages", 
+        e_paper: "E-Paper",
+        save_settings: "Save Settings",
+        ticker_items_english: "Ticker Items (English)", 
+        ticker_items_telugu: "Ticker Items (Telugu)",
         one_per_line: "ఒక లైన్‌కు ఒకటి",
-        link_text: "లింక్ టెక్స్ట్", link_url: "URL", platform: "ప్లాట్‌ఫారమ్",
-        add_link: "లింక్ జోడించు", remove: "తొలగించు",
-        page_title: "పేజీ శీర్షిక", page_content: "పేజీ కంటెంట్",
-        epaper_date: "తేదీ", epaper_url: "PDF URL", add_epaper: "ఇ-పేపర్ జోడించు",
-        site_identity: "సైట్ గుర్తింపు", logo_url: "లోగో చిత్ర URL",
+        link_text: "లింక్ టెక్స్ట్", 
+        link_url: "URL", 
+        platform: "ప్లాట్‌ఫారమ్",
+        add_link: "లింక్ జోడించు", 
+        remove: "Remove",
+        page_title: "పేజీ శీర్షిక", 
+        page_content: "పేజీ కంటెంట్ (మార్క్‌డౌన్)",
+        epaper_date: "తేదీ", 
+        epaper_url: "PDF URL", 
+        add_epaper: "ఇ-పేపర్ జోడించు",
+        site_identity: "Site Identity", 
+        logo_image_url: "Logo Image URL",
         password_reset_info: "ఖాతా ఉన్నట్లయితే, రీసెట్ లింక్ పంపబడింది.",
         settings_saved: "సెట్టింగ్‌లు విజయవంతంగా సేవ్ చేయబడ్డాయి!",
+        error_saving: "డేటాను సేవ్ చేయడంలో లోపం. మార్పులు నిలవకపోవచ్చు.",
     }
 };
 
@@ -140,14 +170,14 @@ let siteSettings = {
             te: { title: "మమ్మల్ని సంప్రదించండి", content: "## మమ్మల్ని సంప్రదించండి\n\n[**దయచేసి ఈ విభాగాన్ని మీ సంప్రదింపు వివరాలతో సవరించండి.**]\n\nమేము మా పాఠకులను గౌరవిస్తాము మరియు మీ అభిప్రాయాన్ని, ప్రశ్నలను లేదా వార్తల చిట్కాలను స్వాగతిస్తాము. దయచేసి దిగువన ఉన్న ఏవైనా మార్గాల ద్వారా మమ్మల్ని సంప్రదించడానికి సంకోచించకండి.\n\n* **చిరునామా:** 123 న్యూస్ లేన్, జూబ్లీ హిల్స్, హైదరాబాద్, తెలంగాణ, 500033, భారతదేశం\n* **సాధారణ విచారణలు:** contact@bc-today.demo\n* **వార్తా విభాగం:** newsdesk@bc-today.demo\n* **ప్రకటనలు:** ads@bc-today.demo\n* **ఫోన్:** +91-40-12345678" }
         },
         privacy: {
-            en: { title: "Privacy Policy", content: "## Privacy Policy\n\n[**Please edit this section. This is a template and not legal advice.**]\n\n**Last updated:** July 21, 2025\n\nYour privacy is important to us. It is BC TODAY's policy to respect your privacy regarding any information we may collect from you across our website...\n\n### Information We Collect\n\nWe may collect personal identification information (Name, email address, phone number, etc.) from Users in a variety of ways, including, but not limited to, when Users visit our site, register on the site, subscribe to the newsletter, and in connection with other activities, services, features or resources we make available on our Site.\n\n### How We Use Your Information\n\nWe use the information we collect to personalize your experience, to improve our website, and to send periodic emails." },
-            te: { title: "గోప్యతా విధానం", content: "## గోప్యతా విధానం\n\n[**దయచేసి ఈ విభాగాన్ని సవరించండి. ఇది ఒక నమూనా మాత్రమే మరియు న్యాయ సలహా కాదు.**]\n\n**చివరిగా నవీకరించబడింది:** జూలై 21, 2025\n\nమీ గోప్యత మాకు ముఖ్యం. మా వెబ్‌సైట్‌లో మేము మీ నుండి సేకరించగల ఏదైనా సమాచారానికి సంబంధించి మీ గోప్యతను గౌరవించడం బీసీ టుడే విధానం...\n\n### మేము సేకరించే సమాచారం\n\nవినియోగదారులు మా సైట్‌ను సందర్శించినప్పుడు, సైట్‌లో నమోదు చేసుకున్నప్పుడు, వార్తాలేఖకు సభ్యత్వాన్ని పొందినప్పుడు మరియు మా సైట్‌లో మేము అందుబాటులో ఉంచే ఇతర కార్యకలాపాలు, సేవలు, ఫీచర్లు లేదా వనరులకు సంబంధించి మేము వినియోగదారుల నుండి వ్యక్తిగత గుర్తింపు సమాచారాన్ని (పేరు, ఇమెయిల్ చిరునామా, ఫోన్ నంబర్ మొదలైనవి) వివిధ మార్గాల్లో సేకరించవచ్చు.\n\n### మేము మీ సమాచారాన్ని ఎలా ఉపయోగిస్తాము\n\nమీ అనుభవాన్ని వ్యక్తిగతీకరించడానికి, మా వెబ్‌సైట్‌ను మెరుగుపరచడానికి మరియు క్రమానుగత ఇమెయిల్‌లను పంపడానికి మేము సేకరించిన సమాచారాన్ని ఉపయోగిస్తాము." }
+            en: { title: "Privacy Policy", content: "## Privacy Policy\n\n[**Please edit this section. This is a template and not legal advice.**]\n\n**Last updated:** July 22, 2025\n\nYour privacy is important to us. It is BC TODAY's policy to respect your privacy regarding any information we may collect from you across our website...\n\n### Information We Collect\n\nWe may collect personal identification information (Name, email address, phone number, etc.) from Users in a variety of ways, including, but not limited to, when Users visit our site, register on the site, subscribe to the newsletter, and in connection with other activities, services, features or resources we make available on our Site.\n\n### How We Use Your Information\n\nWe use the information we collect to personalize your experience, to improve our website, and to send periodic emails." },
+            te: { title: "గోప్యతా విధానం", content: "## గోప్యతా విధానం\n\n[**దయచేసి ఈ విభాగాన్ని సవరించండి. ఇది ఒక నమూనా మాత్రమే మరియు న్యాయ సలహా కాదు.**]\n\n**చివరిగా నవీకరించబడింది:** జూలై 22, 2025\n\nమీ గోప్యత మాకు ముఖ్యం. మా వెబ్‌సైట్‌లో మేము మీ నుండి సేకరించగల ఏదైనా సమాచారానికి సంబంధించి మీ గోప్యతను గౌరవించడం బీసీ టుడే విధానం...\n\n### మేము సేకరించే సమాచారం\n\nవినియోగదారులు మా సైట్‌ను సందర్శించినప్పుడు, సైట్‌లో నమోదు చేసుకున్నప్పుడు, వార్తాలేఖకు సభ్యత్వాన్ని పొందినప్పుడు మరియు మా సైట్‌లో మేము అందుబాటులో ఉంచే ఇతర కార్యకలాపాలు, సేవలు, ఫీచర్లు లేదా వనరులకు సంబంధించి మేము వినియోగదారుల నుండి వ్యక్తిగత గుర్తింపు సమాచారాన్ని (పేరు, ఇమెయిల్ చిరునామా, ఫోన్ నంబర్ మొదలైనవి) వివిధ మార్గాల్లో సేకరించవచ్చు.\n\n### మేము మీ సమాచారాన్ని ఎలా ఉపయోగిస్తాము\n\nమీ అనుభవాన్ని వ్యక్తిగతీకరించడానికి, మా వెబ్‌సైట్‌ను మెరుగుపరచడానికి మరియు క్రమానుగత ఇమెయిల్‌లను పంపడానికి మేము సేకరించిన సమాచారాన్ని ఉపయోగిస్తాము." }
         }
     },
     epapers: [
+        { date: '2025-07-22', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
         { date: '2025-07-21', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-        { date: '2025-07-20', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-        { date: '2025-07-19', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }
+        { date: '2025-07-20', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }
     ]
 };
 
@@ -241,13 +271,73 @@ let sections = [
     }
 ];
 
+// --- Data Persistence Functions ---
+function saveDataToStorage() {
+    try {
+        localStorage.setItem(SITE_SETTINGS_KEY, JSON.stringify(siteSettings));
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
+        console.log("Data saved to localStorage.");
+    } catch (e) {
+        console.error("Failed to save data to localStorage", e);
+        showToast(getT('error_saving'), 'error');
+    }
+}
+
+function loadDataFromStorage() {
+    try {
+        const storedSettings = localStorage.getItem(SITE_SETTINGS_KEY);
+        const storedSections = localStorage.getItem(SECTIONS_KEY);
+
+        if (storedSettings && storedSections) {
+            siteSettings = JSON.parse(storedSettings);
+            sections = JSON.parse(storedSections);
+            console.log("Data loaded from localStorage.");
+        } else {
+            // First visit or cleared storage, save the default data
+            console.log("No data in localStorage. Saving default data.");
+            saveDataToStorage();
+        }
+    } catch (e) {
+        console.error("Failed to load data from localStorage. Using default data.", e);
+        // In case of parsing error, it will fall back to the default data already in the script.
+    }
+}
+
+
 // --- Utility Functions ---
 const getArticleByIds = (sectionId, articleId) => {
     const section = sections.find(s => s.id === sectionId);
     return section ? section.articles.find(a => a.id === articleId) : null;
 };
 
-const getT = (key) => translations[currentLanguage][key] || translations['en'][key] || key;
+const getT = (key) => (translations[currentLanguage] && translations[currentLanguage][key]) || translations['en'][key] || key;
+
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    // Animate in
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 100);
+
+    // Animate out and remove
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => {
+            if (toast) {
+                toast.remove();
+            }
+        });
+    }, duration);
+}
 
 
 // --- Routing ---
@@ -277,6 +367,15 @@ function router() {
         if (parts[0] === 'privacy') renderStaticPage('privacy');
         if (parts[0] === 'epaper') renderEPaperPage();
         if (parts[0] === 'settings') renderSettingsPage();
+        if (parts[0] === 'login') {
+             // If login page, and user is already logged in, redirect to home
+            if (isLoggedIn) {
+                location.hash = '';
+                return;
+            }
+            // Re-initialize the Google button if the view is rendered again
+            initializeGsi();
+        }
         navId = parts[0]; // Highlight nav item if it exists
     } else if (parts[0] === 'search' && parts.length > 1) {
         const query = decodeURIComponent(parts[1] || '');
@@ -324,6 +423,10 @@ function switchLanguage(lang) {
     renderFooter();
     updateHeaderUI();
     renderModals();
+    // Re-render settings if visible
+    if(document.getElementById('settings-view').style.display === 'block') {
+        renderSettingsPage();
+    }
 }
 
 function updateDate() {
@@ -345,7 +448,6 @@ function renderAndAnimateTicker() {
     }
 
     const tickerContent = document.getElementById('news-ticker-content');
-    // "BREAKING" is now hardcoded in translations for both languages
     const breakingKey = getT('breaking'); 
     const items = siteSettings.tickerItems[currentLanguage] || siteSettings.tickerItems.en;
 
@@ -398,12 +500,11 @@ function renderNav() {
     const navItems = sections.filter(s => s.isNav);
     navContainer.innerHTML = navItems.map(item => {
         const href = item.id === 'home' ? '#' : `#/${item.id}`;
-        // Use the item's ID for the data-lang-key if it's a common English word, otherwise use the title.
-        const langKey = (['epaper'].includes(item.id)) ? item.id : (item.en.title.toLowerCase().replace(' ', '_'));
+        // Use a generic key for translation lookup that matches the `translations` object
+        const langKey = (item.en.title.toLowerCase().replace(/ /g, '_'));
         return `<a href="${href}" class="nav-link font-semibold uppercase text-sm mx-3 flex-shrink-0" data-lang-key="${langKey}" data-nav-id="${item.id}">${item[currentLanguage].title}</a>`;
     }).join('');
     
-    // Add "Add New Article" button for admin
     if (loggedInUserType === 'admin') {
         navContainer.innerHTML += `<button onclick="openAddModal()" class="ml-auto bg-white/20 hover:bg-white/30 text-white font-bold py-1 px-3 rounded text-sm flex-shrink-0">${getT('add_new_article')}</button>`;
     }
@@ -438,7 +539,6 @@ function renderHomePage() {
     mainContentCol.innerHTML = '';
     const themeColors = { blue: 'border-blue-600', orange: 'border-orange-500', green: 'border-green-500', indigo: 'border-indigo-500', red: 'border-red-500', purple: 'border-purple-600', yellow: 'border-yellow-500', cyan: 'border-cyan-500' };
 
-    // Top Stories Slideshow
     const topStoriesSection = sections.find(s => s.isTopStory);
     if (topStoriesSection && topStoriesSection.articles.length > 0) {
         const slidesHtml = topStoriesSection.articles.map((article, index) => {
@@ -468,7 +568,6 @@ function renderHomePage() {
             </section>`;
     }
     
-    // Other Sections
     sections.filter(s => !s.isTopStory && s.articles && s.articles.length > 0).forEach(section => {
         const langContent = section[currentLanguage];
         const sectionHtml = `
@@ -491,7 +590,6 @@ function renderHomePage() {
 function renderSidebar() {
     const sidebarCol = document.getElementById('sidebar-col');
     
-    // BC Events Section
     const bcEventsSection = sections.find(s => s.id === 'bc-events');
     let bcEventsHtml = '';
     if (bcEventsSection && bcEventsSection.articles) {
@@ -512,7 +610,6 @@ function renderSidebar() {
         </div>`;
     }
 
-    // Most Read Section
     const allArticles = sections.flatMap(s => s.articles || []);
     const sortedArticles = allArticles.sort((a, b) => b.views - a.views).slice(0, 5);
 
@@ -532,7 +629,6 @@ function renderSidebar() {
             ${mostReadArticlesHtml}
         </div>`;
 
-    // Combine and render
     sidebarCol.innerHTML = bcEventsHtml + mostReadBoxHtml;
 }
 
@@ -584,7 +680,6 @@ function renderArticlePage(article, sectionId) {
         <div class="ad-placeholder ad-placeholder-in-article mt-8">In-Article Ad (300x250)</div>
     `;
     
-    // Render related stories
     const section = sections.find(s => s.id === sectionId);
     const relatedArticles = section.articles.filter(a => a.id !== article.id).slice(0, 4);
     const relatedHtml = relatedArticles.map(relArt => {
@@ -605,7 +700,7 @@ function renderFooter() {
     const footerContent = document.getElementById('footer-content');
     
     const quickLinksHtml = siteSettings.quickLinks.map(link => 
-        `<li class="mb-2"><a href="${link.href}" class="hover:text-blue-400" data-lang-key="${link.text.toLowerCase().replace(' ', '_')}">${getT(link.text.toLowerCase().replace(' ', '_'))}</a></li>`
+        `<li class="mb-2"><a href="${link.href}" class="hover:text-blue-400" data-lang-key="${link.text.toLowerCase().replace(/ /g, '_')}">${getT(link.text.toLowerCase().replace(/ /g, '_'))}</a></li>`
     ).join('');
 
     const socialIcons = {
@@ -650,7 +745,8 @@ function renderFooter() {
 }
 
 function renderStaticPage(pageKey) {
-    const page = siteSettings.pages[pageKey][currentLanguage];
+    // Always render the English version of the static pages as requested.
+    const page = siteSettings.pages[pageKey]['en'];
     const view = document.getElementById(`${pageKey}-view`);
     if (page && view) {
         view.innerHTML = `<div class="p-6 md:p-10 rounded-lg shadow-xl bg-[var(--card-bg-color)] prose max-w-none dark:prose-invert">${marked.parse(page.content)}</div>`;
@@ -708,6 +804,7 @@ function navigateToArticle(sectionId, articleId) {
     const article = getArticleByIds(sectionId, articleId);
     if (!article) return;
     article.views = (article.views || 0) + 1;
+    saveDataToStorage(); // Save view count change
     location.hash = `/article/${sectionId}/${article.id}`;
 }
 
@@ -760,8 +857,9 @@ function handleEditSubmit(event) {
     article.te.fullStory = form.querySelector('#edit-fullStory-te').value;
     article.img = form.querySelector('#edit-img').value;
     
+    saveDataToStorage(); // Save changes
     document.getElementById('edit-modal').classList.add('hidden');
-    router();
+    router(); // Re-render the page
 }
 
 function handleAddSubmit(event) {
@@ -784,9 +882,10 @@ function handleAddSubmit(event) {
         section.articles = [];
     }
     section.articles.unshift(newArticle);
+    saveDataToStorage(); // Save new article
     document.getElementById('add-modal').classList.add('hidden');
     form.reset();
-    router();
+    router(); // Re-render the page
 }
 
 function renderModals() {
@@ -801,15 +900,15 @@ function renderModals() {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <h3 class="font-bold text-lg mb-2">English Content</h3>
-                        <div class="mb-4"><label for="edit-title-en" class="block font-bold mb-2">Title</label><input type="text" id="edit-title-en" class="w-full p-2 border rounded"></div>
-                        <div class="mb-4"><label for="edit-author-en" class="block font-bold mb-2">Author</label><input type="text" id="edit-author-en" class="w-full p-2 border rounded"></div>
-                        <div class="mb-4"><label for="edit-fullStory-en" class="block font-bold mb-2">Full Story</label><textarea id="edit-fullStory-en" rows="5" class="w-full p-2 border rounded"></textarea></div>
+                        <div class="mb-4"><label for="edit-title-en" class="block font-bold mb-2">${t('title')}</label><input type="text" id="edit-title-en" class="w-full p-2 border rounded"></div>
+                        <div class="mb-4"><label for="edit-author-en" class="block font-bold mb-2">${t('author')}</label><input type="text" id="edit-author-en" class="w-full p-2 border rounded"></div>
+                        <div class="mb-4"><label for="edit-fullStory-en" class="block font-bold mb-2">${t('full_story')}</label><textarea id="edit-fullStory-en" rows="5" class="w-full p-2 border rounded"></textarea></div>
                     </div>
                     <div>
                         <h3 class="font-bold text-lg mb-2">Telugu Content</h3>
-                        <div class="mb-4"><label for="edit-title-te" class="block font-bold mb-2">శీర్షిక</label><input type="text" id="edit-title-te" class="w-full p-2 border rounded"></div>
-                        <div class="mb-4"><label for="edit-author-te" class="block font-bold mb-2">రచయిత</label><input type="text" id="edit-author-te" class="w-full p-2 border rounded"></div>
-                        <div class="mb-4"><label for="edit-fullStory-te" class="block font-bold mb-2">పూర్తి కథనం</label><textarea id="edit-fullStory-te" rows="5" class="w-full p-2 border rounded"></textarea></div>
+                        <div class="mb-4"><label for="edit-title-te" class="block font-bold mb-2">${t('title')}</label><input type="text" id="edit-title-te" class="w-full p-2 border rounded"></div>
+                        <div class="mb-4"><label for="edit-author-te" class="block font-bold mb-2">${t('author')}</label><input type="text" id="edit-author-te" class="w-full p-2 border rounded"></div>
+                        <div class="mb-4"><label for="edit-fullStory-te" class="block font-bold mb-2">${t('full_story')}</label><textarea id="edit-fullStory-te" rows="5" class="w-full p-2 border rounded"></textarea></div>
                     </div>
                 </div>
                 <div class="mb-4 border-t pt-4 mt-4"><label for="edit-img" class="block font-bold mb-2">${t('image_url')}</label><input type="text" id="edit-img" class="w-full p-2 border rounded"></div>
@@ -830,15 +929,15 @@ function renderModals() {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <h3 class="font-bold text-lg mb-2">English Content</h3>
-                        <div class="mb-4"><label for="add-title-en" class="block font-bold mb-2">Title</label><input type="text" id="add-title-en" class="w-full p-2 border rounded" required></div>
-                        <div class="mb-4"><label for="add-author-en" class="block font-bold mb-2">Author</label><input type="text" id="add-author-en" class="w-full p-2 border rounded" required></div>
-                        <div class="mb-4"><label for="add-fullStory-en" class="block font-bold mb-2">Full Story</label><textarea id="add-fullStory-en" rows="5" class="w-full p-2 border rounded" required></textarea></div>
+                        <div class="mb-4"><label for="add-title-en" class="block font-bold mb-2">${t('title')}</label><input type="text" id="add-title-en" class="w-full p-2 border rounded" required></div>
+                        <div class="mb-4"><label for="add-author-en" class="block font-bold mb-2">${t('author')}</label><input type="text" id="add-author-en" class="w-full p-2 border rounded" required></div>
+                        <div class="mb-4"><label for="add-fullStory-en" class="block font-bold mb-2">${t('full_story')}</label><textarea id="add-fullStory-en" rows="5" class="w-full p-2 border rounded" required></textarea></div>
                     </div>
                     <div>
                         <h3 class="font-bold text-lg mb-2">Telugu Content</h3>
-                        <div class="mb-4"><label for="add-title-te" class="block font-bold mb-2">శీర్షిక</label><input type="text" id="add-title-te" class="w-full p-2 border rounded" required></div>
-                        <div class="mb-4"><label for="add-author-te" class="block font-bold mb-2">రచయిత</label><input type="text" id="add-author-te" class="w-full p-2 border rounded" required></div>
-                        <div class="mb-4"><label for="add-fullStory-te" class="block font-bold mb-2">పూర్తి కథనం</label><textarea id="add-fullStory-te" rows="5" class="w-full p-2 border rounded" required></textarea></div>
+                        <div class="mb-4"><label for="add-title-te" class="block font-bold mb-2">${t('title')}</label><input type="text" id="add-title-te" class="w-full p-2 border rounded" required></div>
+                        <div class="mb-4"><label for="add-author-te" class="block font-bold mb-2">${t('author')}</label><input type="text" id="add-author-te" class="w-full p-2 border rounded" required></div>
+                        <div class="mb-4"><label for="add-fullStory-te" class="block font-bold mb-2">${t('full_story')}</label><textarea id="add-fullStory-te" rows="5" class="w-full p-2 border rounded" required></textarea></div>
                     </div>
                 </div>
                 <div class="mb-4 border-t pt-4 mt-4"><label for="add-img" class="block font-bold mb-2">${t('image_url')}</label><input type="text" id="add-img" class="w-full p-2 border rounded" value="https://placehold.co/400x250/cccccc/000000?text=New+Article" required></div>
@@ -858,6 +957,8 @@ function updateHeaderUI() {
     const loginLink = document.getElementById('header-login-link');
     const profileSection = document.getElementById('profile-section');
     const profileDropdown = document.getElementById('profile-dropdown');
+    const profileAvatar = document.getElementById('profile-avatar');
+    const profileName = document.getElementById('profile-name');
 
     if (isLoggedIn) {
         loginLink.classList.add('hidden');
@@ -865,13 +966,18 @@ function updateHeaderUI() {
         
         let dropdownHtml = '';
         if (loggedInUserType === 'admin') {
+            profileAvatar.src = `https://placehold.co/40x40/d32f2f/ffffff?text=A`;
+            profileName.textContent = "Admin";
             dropdownHtml += `<a href="#/settings" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600" data-lang-key="settings">${getT('settings')}</a>`;
             dropdownHtml += `<button id="edit-mode-toggle" class="w-full text-left block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600" data-lang-key="${isEditMode ? 'disable_editing' : 'enable_editing'}">${isEditMode ? getT('disable_editing') : getT('enable_editing')}</button>`;
+        } else if (loggedInUserType === 'user') {
+            profileAvatar.src = loggedInUserProfile.avatar || `https://placehold.co/40x40/cccccc/000000?text=U`;
+            profileName.textContent = loggedInUserProfile.name || 'User';
         }
+
         dropdownHtml += `<a href="#" id="logout-button-header" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600" data-lang-key="logout">${getT('logout')}</a>`;
         profileDropdown.innerHTML = dropdownHtml;
 
-        // Re-add event listeners
         document.getElementById('logout-button-header').addEventListener('click', handleLogout);
         const editModeToggle = document.getElementById('edit-mode-toggle');
         if (editModeToggle) {
@@ -899,26 +1005,73 @@ function handleAdminLogin(event) {
     }
 }
 
-function handleUserLogin() {
+// --- Google Sign-In (NEW) ---
+function handleCredentialResponse(response) {
+    console.log("Encoded JWT ID token: " + response.credential);
+    const decodedToken = jwt_decode(response.credential);
+    
+    loggedInUserProfile = {
+        id: decodedToken.sub,
+        name: decodedToken.name,
+        avatar: decodedToken.picture,
+        email: decodedToken.email
+    };
+    
     isLoggedIn = true;
     loggedInUserType = 'user';
+    
     updateHeaderUI();
     renderFooter();
     renderNav();
-    location.hash = '';
+    showToast(`Welcome, ${loggedInUserProfile.name}!`, 'success');
+    location.hash = ''; // Go to home page after login
 }
 
 function handleLogout(e) {
     if(e) e.preventDefault();
+
+    if (loggedInUserType === 'user') {
+        // Disables automatic sign-in for the user
+        google.accounts.id.disableAutoSelect();
+        console.log('User signed out from Google.');
+    }
+
     isLoggedIn = false;
     loggedInUserType = null;
-    if (isEditMode) toggleEditMode(); // Turn off edit mode on logout
+    loggedInUserProfile = {};
+    if (isEditMode) toggleEditMode(); // Also disable edit mode on logout
+
     updateHeaderUI();
     document.getElementById('profile-dropdown').classList.add('hidden');
     renderFooter();
     renderNav();
     router();
 }
+
+function initializeGsi() {
+    if (typeof google === 'undefined') {
+        console.error("Google Identity Services script not loaded.");
+        return;
+    }
+    
+    google.accounts.id.initialize({
+        // IMPORTANT: REPLACE with your actual Google Client ID.
+        client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com",
+        callback: handleCredentialResponse
+    });
+
+    const gsiContainer = document.getElementById('google-signin-button');
+    if (gsiContainer) {
+        google.accounts.id.renderButton(
+            gsiContainer,
+            { theme: "outline", size: "large", text: "signin_with", shape: "rectangular" }
+        );
+    }
+    
+    // Optional: Prompt for one-tap sign-in on subsequent visits
+    // google.accounts.id.prompt();
+}
+
 
 // --- Theme ---
 function applyTheme(theme) {
@@ -945,9 +1098,9 @@ function renderSettingsPage() {
     view.innerHTML = `
         <h1 class="font-playfair text-4xl font-bold mb-6">${t('settings')}</h1>
         <div class="settings-tabs">
-            <button class="settings-tab-button active" data-tab="general">${t('general_settings')}</button>
-            <button class="settings-tab-button" data-tab="pages">${t('pages_content')}</button>
-            <button class="settings-tab-button" data-tab="epaper">${t('epaper_settings')}</button>
+            <button class="settings-tab-button active" data-tab="general">${t('general')}</button>
+            <button class="settings-tab-button" data-tab="pages">${t('pages')}</button>
+            <button class="settings-tab-button" data-tab="epaper">${t('e_paper')}</button>
         </div>
 
         <!-- General Settings Tab -->
@@ -956,7 +1109,7 @@ function renderSettingsPage() {
                  <div class="settings-card mb-6">
                     <h3 class="font-bold text-lg mb-4 border-b pb-2">${t('site_identity')}</h3>
                     <div>
-                        <label for="logo-url" class="block font-bold mb-2">${t('logo_url')}</label>
+                        <label for="logo-url" class="block font-bold mb-2">${t('logo_image_url')}</label>
                         <input type="text" id="logo-url" class="w-full p-2 border rounded" value="${siteSettings.logoUrl}">
                     </div>
                 </div>
@@ -964,11 +1117,11 @@ function renderSettingsPage() {
                     <h3 class="font-bold text-lg mb-4 border-b pb-2">${t('breaking')}</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="ticker-items-en" class="block font-bold mb-2">${t('ticker_items_en')}</label>
+                            <label for="ticker-items-en" class="block font-bold mb-2">${t('ticker_items_english')}</label>
                             <textarea id="ticker-items-en" rows="4" class="w-full p-2 border rounded" placeholder="${t('one_per_line')}">${siteSettings.tickerItems.en.join('\n')}</textarea>
                         </div>
                         <div>
-                            <label for="ticker-items-te" class="block font-bold mb-2">${t('ticker_items_te')}</label>
+                            <label for="ticker-items-te" class="block font-bold mb-2">${t('ticker_items_telugu')}</label>
                             <textarea id="ticker-items-te" rows="4" class="w-full p-2 border rounded" placeholder="${t('one_per_line')}">${siteSettings.tickerItems.te.join('\n')}</textarea>
                         </div>
                     </div>
@@ -995,11 +1148,11 @@ function renderSettingsPage() {
                         <h3 class="font-bold text-lg mb-4 border-b pb-2">${siteSettings.pages[key].en.title} / ${siteSettings.pages[key].te.title}</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
-                                <label for="page-${key}-en" class="block font-bold mb-2">English Content (Markdown supported)</label>
+                                <label for="page-${key}-en" class="block font-bold mb-2">${t('page_content')}</label>
                                 <textarea id="page-${key}-en" data-page-key="${key}" data-lang="en" rows="8" class="w-full p-2 border rounded">${siteSettings.pages[key].en.content}</textarea>
                             </div>
                             <div>
-                                <label for="page-${key}-te" class="block font-bold mb-2">Telugu Content (Markdown supported)</label>
+                                <label for="page-${key}-te" class="block font-bold mb-2">${t('page_content')}</label>
                                 <textarea id="page-${key}-te" data-page-key="${key}" data-lang="te" rows="8" class="w-full p-2 border rounded">${siteSettings.pages[key].te.content}</textarea>
                             </div>
                         </div>
@@ -1013,7 +1166,7 @@ function renderSettingsPage() {
         <div id="tab-epaper" class="settings-tab-content">
              <form id="epaper-settings-form">
                 <div class="settings-card mb-6">
-                    <h3 class="font-bold text-lg mb-4 border-b pb-2">${t('epaper_settings')}</h3>
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2">${t('e_paper')}</h3>
                     <div id="epaper-editor"></div>
                     <button type="button" id="add-epaper-link" class="mt-2 text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">${t('add_epaper')}</button>
                 </div>
@@ -1022,17 +1175,13 @@ function renderSettingsPage() {
         </div>
     `;
 
-    // Populate dynamic editors
     renderQuickLinksEditor();
     renderSocialLinksEditor();
     renderEPaperEditor();
-    
-    // Add event listeners for the settings page
     addSettingsEventListeners();
 }
 
 function addSettingsEventListeners() {
-    // Tab switching
     document.querySelectorAll('.settings-tab-button').forEach(button => {
         button.addEventListener('click', () => {
             document.querySelectorAll('.settings-tab-button').forEach(btn => btn.classList.remove('active'));
@@ -1042,18 +1191,16 @@ function addSettingsEventListeners() {
         });
     });
 
-    // Form submissions
     document.getElementById('general-settings-form').addEventListener('submit', handleGeneralSettingsSave);
     document.getElementById('pages-settings-form').addEventListener('submit', handlePagesSettingsSave);
     document.getElementById('epaper-settings-form').addEventListener('submit', handleEPaperSettingsSave);
 
-    // Add/Remove buttons
     document.getElementById('add-quick-link').addEventListener('click', () => {
-        siteSettings.quickLinks.push({ text: '', href: '' });
+        siteSettings.quickLinks.push({ text: 'New Link', href: '#' });
         renderQuickLinksEditor();
     });
     document.getElementById('add-social-link').addEventListener('click', () => {
-        siteSettings.followUs.push({ platform: '', href: '' });
+        siteSettings.followUs.push({ platform: 'Platform', href: '#' });
         renderSocialLinksEditor();
     });
     document.getElementById('add-epaper-link').addEventListener('click', () => {
@@ -1064,12 +1211,15 @@ function addSettingsEventListeners() {
 
 function renderDynamicEditor(containerId, items, fields, removeCallback) {
     const container = document.getElementById(containerId);
+    if (!container) return;
+    const t = (key) => getT(key);
+
     container.innerHTML = items.map((item, index) => `
         <div class="settings-field-group" data-index="${index}">
             ${fields.map(field => `
-                <input type="text" value="${item[field.key] || ''}" class="w-full p-2 border rounded" placeholder="${getT(field.placeholder)}">
+                <input type="text" value="${item[field.key] || ''}" class="w-full p-2 border rounded" placeholder="${t(field.placeholder)}">
             `).join('')}
-            <button type="button" class="remove-btn bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">${getT('remove')}</button>
+            <button type="button" class="remove-btn bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">${t('remove')}</button>
         </div>
     `).join('');
 
@@ -1113,14 +1263,10 @@ function renderEPaperEditor() {
 
 function handleGeneralSettingsSave(e) {
     e.preventDefault();
-    // Logo
     siteSettings.logoUrl = document.getElementById('logo-url').value;
-
-    // Ticker
     siteSettings.tickerItems.en = document.getElementById('ticker-items-en').value.split('\n').filter(Boolean);
     siteSettings.tickerItems.te = document.getElementById('ticker-items-te').value.split('\n').filter(Boolean);
     
-    // Quick Links
     const quickLinks = [];
     document.querySelectorAll('#quick-links-editor .settings-field-group').forEach(group => {
         const inputs = group.querySelectorAll('input');
@@ -1130,7 +1276,6 @@ function handleGeneralSettingsSave(e) {
     });
     siteSettings.quickLinks = quickLinks;
 
-    // Social Links
     const socialLinks = [];
     document.querySelectorAll('#social-links-editor .settings-field-group').forEach(group => {
         const inputs = group.querySelectorAll('input');
@@ -1140,10 +1285,11 @@ function handleGeneralSettingsSave(e) {
     });
     siteSettings.followUs = socialLinks;
 
+    saveDataToStorage();
+    showToast(getT('settings_saved'), 'success');
     updateLogo();
     renderAndAnimateTicker();
     renderFooter();
-    alert('General settings saved!');
 }
 
 function handlePagesSettingsSave(e) {
@@ -1153,7 +1299,8 @@ function handlePagesSettingsSave(e) {
         const lang = area.dataset.lang;
         siteSettings.pages[key][lang].content = area.value;
     });
-    alert('Page content saved!');
+    saveDataToStorage();
+    showToast(getT('settings_saved'), 'success');
 }
 
 function handleEPaperSettingsSave(e) {
@@ -1166,22 +1313,28 @@ function handleEPaperSettingsSave(e) {
         }
     });
     siteSettings.epapers = epapers;
-    alert('E-Paper settings saved!');
+    saveDataToStorage();
+    showToast(getT('settings_saved'), 'success');
 }
 
 
 // --- Initial Setup ---
 window.addEventListener('DOMContentLoaded', () => {
-    // Add hashchange listener immediately
+    // Load data from localStorage first
+    loadDataFromStorage();
+
+    // The GSI script is loaded async, so we need to wait for it.
+    // This will be called by the script itself once loaded.
+    // We also call it here in case the script is already cached and loaded.
+    initializeGsi();
+
     window.addEventListener('hashchange', router);
 
-    // Set hash to empty to always start at home page.
-    // This will trigger the hashchange listener which calls the router.
+    // If there's a hash on load, clear it to ensure we start at the homepage
     if (location.hash !== '') {
         location.hash = '';
     }
 
-    // Theme setup
     const savedTheme = localStorage.getItem('theme') || 'light';
     applyTheme(savedTheme);
     document.getElementById('theme-toggle').addEventListener('click', () => {
@@ -1190,19 +1343,15 @@ window.addEventListener('DOMContentLoaded', () => {
         applyTheme(newTheme);
     });
 
-    // Initial render
-    const savedLang = localStorage.getItem('language') || 'te';
-    document.getElementById('language-switcher').value = savedLang;
-    switchLanguage(savedLang);
+    const defaultLang = 'te';
+    document.getElementById('language-switcher').value = defaultLang;
+    switchLanguage(defaultLang);
     
-    // Event Listeners
     document.getElementById('language-switcher').addEventListener('change', (e) => {
-        localStorage.setItem('language', e.target.value);
         switchLanguage(e.target.value);
-        router(); // Re-route after language change
+        router();
     });
 
-    // Search
     const searchHandler = (e) => {
         e.preventDefault();
         const query = e.target.querySelector('input[type="search"]').value;
@@ -1214,27 +1363,23 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('mobile-search-form').classList.toggle('hidden');
     });
 
-    // Auth
     document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
-    document.getElementById('google-login-btn').addEventListener('click', handleUserLogin);
     
-    // Profile Dropdown
     document.getElementById('profile-button').addEventListener('click', (e) => {
         e.stopPropagation();
         document.getElementById('profile-dropdown').classList.toggle('hidden');
     });
     document.addEventListener('click', (e) => {
-        if (!document.getElementById('profile-section').contains(e.target)) {
+        if (document.getElementById('profile-section') && !document.getElementById('profile-section').contains(e.target)) {
             document.getElementById('profile-dropdown').classList.add('hidden');
         }
     });
 
-    // Home buttons
     document.querySelectorAll('a[href="#"], .back-to-home').forEach(el => el.addEventListener('click', e => {
         e.preventDefault();
         location.hash = '';
     }));
     
-    // Final router call to render the correct initial page (which will be home)
+    // Initial render
     router();
 });
