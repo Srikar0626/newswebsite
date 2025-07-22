@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <title>BC TODAY - Your Daily News Source</title>
     
     <!-- External Stylesheet -->
@@ -19,7 +23,6 @@
     <div class="top-bar py-1 text-sm">
         <div class="container mx-auto flex justify-between items-center px-4">
             <div>
-                <!-- This top link is now redundant as E-Paper is in the main nav, but can be kept for consistency -->
                 <a href="#/epaper" class="px-2 hover:underline" data-lang-key="epaper">E-Paper</a>
             </div>
             <div class="flex gap-4">
@@ -34,11 +37,9 @@
         <div class="container mx-auto">
             <div class="flex justify-between items-center w-full gap-4">
                 <!-- Left: Logo & Title -->
-                <a href="#" class="flex items-center gap-4 flex-shrink-0">
-                    <!-- Logo is now bigger -->
+                <a href="#" class="flex items-center gap-4 flex-shrink-0 back-to-home">
                     <img id="logo-img" src="https://placehold.co/80x80/d32f2f/ffffff?text=BCT" alt="Logo" class="h-20 w-20 rounded-full">
                     <div>
-                        <!-- Title font size is increased -->
                         <h1 id="site-title" class="font-playfair text-3xl sm:text-4xl md:text-5xl font-extrabold whitespace-nowrap">BC TODAY</h1>
                         <p id="current-date" class="text-sm opacity-70 mt-1"></p>
                     </div>
@@ -72,6 +73,7 @@
                         
                         <!-- Profile Section (Logged In) -->
                         <div id="profile-section" class="hidden relative flex items-center gap-2">
+                            <span id="profile-name" class="hidden sm:inline font-semibold"></span>
                              <button id="profile-button" class="p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                                  <img id="profile-avatar" src="https://placehold.co/40x40/cccccc/000000?text=U" class="h-8 w-8 rounded-full">
                             </button>
@@ -146,13 +148,13 @@
             <div class="max-w-4xl mx-auto">
                 <div class="grid md:grid-cols-2 gap-8">
                     <!-- User Login Card -->
-                    <div class="p-6 md:p-10 rounded-lg shadow-xl article-card text-center flex flex-col justify-center">
+                    <div class="p-6 md:p-10 rounded-lg shadow-xl article-card text-center flex flex-col justify-center items-center">
                         <h2 class="font-playfair text-3xl font-bold mb-4" data-lang-key="user_login">User Login</h2>
                         <p class="mb-6" data-lang-key="user_login_prompt">Login with your social account to comment and participate.</p>
-                        <button id="google-login-btn" class="login-btn bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 w-full justify-center">
-                            <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.222 0-9.522-3.343-11.114-7.943l-6.571 4.819C9.656 40.337 16.318 44 24 44z"></path><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C42.012 36.49 44 30.686 44 24c0-1.341-.138-2.65-.389-3.917z"></path></svg>
-                            <span data-lang-key="login_with_google">Login with Google</span>
-                        </button>
+                        <!-- Google Sign-In Button -->
+                        <div id="gsi-container" class="flex justify-center">
+                            <div id="google-signin-button"></div>
+                        </div>
                     </div>
                      <!-- Staff Login Card -->
                     <div class="p-6 md:p-10 rounded-lg shadow-xl article-card">
@@ -160,11 +162,11 @@
                          <form id="admin-login-form">
                             <div class="mb-4">
                                 <label for="username" class="block font-bold mb-2" data-lang-key="username">Username</label>
-                                <input type="text" id="username" class="w-full p-2 border rounded" value="admin" autocomplete="username">
+                                <input type="text" id="username" class="w-full p-2 border rounded" autocomplete="username">
                             </div>
                             <div class="mb-6">
                                 <label for="password" class="block font-bold mb-2" data-lang-key="password">Password</label>
-                                <input type="password" id="password" class="w-full p-2 border rounded" value="password123" autocomplete="current-password">
+                                <input type="password" id="password" class="w-full p-2 border rounded" autocomplete="current-password">
                             </div>
                             <div class="flex justify-between items-center mb-4 text-sm">
                                 <label class="flex items-center">
@@ -199,9 +201,9 @@
     <!-- Toast Notification -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-[1100]"></div>
 
-
     <!-- External JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://jwt-decode.js.org/build/jwt-decode.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
